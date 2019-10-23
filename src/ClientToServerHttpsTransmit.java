@@ -1,6 +1,7 @@
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 
 public class ClientToServerHttpsTransmit implements Runnable {
@@ -32,10 +33,18 @@ public class ClientToServerHttpsTransmit implements Runnable {
                         proxyToServerOS.flush();
                     }
                 }
-            } while (read >= 0);
+            }
+            while (read >= 0);
         }
         catch (SocketTimeoutException ste) {
             // TODO: handle exception
+            //ste.printStackTrace();
+            System.out.println("Client won't send anymore.");
+        }
+        catch (SocketException se) {
+            if(se.getMessage().equals("Socket closed")) {
+                System.out.println("Socket closed commonly.");
+            }
         }
         catch (IOException e) {
             System.out.println("Proxy to client HTTPS read timed out");

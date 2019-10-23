@@ -76,6 +76,10 @@ public class RequestProcessorCore implements Runnable {
 			return;
 		}
 
+		if(requestString == null) {
+			return;
+		}
+
 		// Parse out URL
 
 		System.out.println("Request Received " + requestString);
@@ -263,16 +267,14 @@ public class RequestProcessorCore implements Runnable {
 			stringBuffer.append("Proxy-agent: ProxyServer/1.0\n\r\n");
 			System.out.println(stringBuffer.toString());
 			proxyToClientBw.write(stringBuffer.toString());
-			//proxyToClientBw.flush();
 
-			// Send success code to client
-			//String line = "HTTP/1.1 200 OK\n" +
-			//		"Proxy-agent: ProxyServer/1.0\n" +
-			//		"\r\n";
-			//proxyToClientBw.write(line);
+			if(ImageDownloader.tryDownloadAsImage(urlString, proxyToClientBw, clientSocket)) {
+				System.out.println("Download as Image OK!");
+				return;
+			}
+
 
 			// Read from input stream between proxy and remote server
-
 			try {
 				int len = 0;
 				do {
@@ -327,7 +329,7 @@ public class RequestProcessorCore implements Runnable {
 		try{
 			// Only first line of HTTPS request has been read at this point (CONNECT *)
 			// Read (and throw away) the rest of the initial data on the stream
-			for(int i = 0; i < 5; i ++){
+			for(int i = 0; i < 5; i ++) {
 				System.out.println(proxyToClientBr.readLine());
 			}
 
@@ -345,8 +347,6 @@ public class RequestProcessorCore implements Runnable {
 			proxyToClientBw.write(line);
 			proxyToClientBw.flush();
 
-			
-			
 			// Client and Remote will both start sending data to proxy at this point
 			// Proxy needs to asynchronously read data from each party and send it to the other party
 

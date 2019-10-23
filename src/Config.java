@@ -4,6 +4,8 @@ public class Config {
 
     public HashMap<String, Boolean> filterKeys;
 
+    public boolean useIndependent;
+
     private static Config sConfig;
 
     private Config() {
