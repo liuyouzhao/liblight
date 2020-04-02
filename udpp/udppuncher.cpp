@@ -17,7 +17,6 @@ static void *on_recv(UdpBase *server, char *ip, int port, char *msg, int len, vo
         std::string ipStr = content.substr(0, colonIndex - 1);
         std::string portStr = content.substr(colonIndex + 1);
         int peerPortUpdate = atoi(portStr.c_str());
-        Log::d("Update peerAddress %s:%d", ipStr.c_str(), peerPortUpdate);
         ptrThis->updatePeer(ipStr, peerPortUpdate);
     }
     else if(ptrThis->isPeer(ip, port))

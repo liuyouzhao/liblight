@@ -44,6 +44,10 @@ void P2pSwitcher::swapPeerAddress(std::string reqIp, int reqPort)
         updatePeerPair(reqIp, reqPort);
         return;
     }
+    else
+    {
+        this->peerPortPair[index] = reqPort;
+    }
 
     int indexToNotice = swap[index];
     std::string peerIp = peerAddrPair[indexToNotice];
@@ -55,8 +59,8 @@ void P2pSwitcher::swapPeerAddress(std::string reqIp, int reqPort)
     }
 
     std::stringstream ss;
-    ss << peerIp.c_str() << ":" << peerPort;
+    ss << reqIp.c_str() << ":" << reqPort;
     std::string content = std::string(ss.str());
 
-    tryNotice(reqIp, reqPort, content);
+    tryNotice(peerIp, peerPort, content);
 }

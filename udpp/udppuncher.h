@@ -5,6 +5,7 @@
 #include <string>
 #include "udpserver.h"
 #include "threadpool.h"
+#include "log.h"
 
 namespace udpp
 {
@@ -19,8 +20,11 @@ public:
     void recv();
     inline void updatePeer(std::string ip, int port)
     {
-        this->peerAddress = ip;
-        this->peerPort = port;
+        if(peerAddress == ip && peerPort == port)
+            return;
+        peerAddress = ip;
+        peerPort = port;
+        Log::d("Update peerAddress to %s:%d", peerAddress.c_str(), peerPort);
     }
     inline bool isSwitchServer(const char *ip, int port)
     {
