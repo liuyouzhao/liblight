@@ -4,6 +4,7 @@
 #include "threadpool.h"
 #include "udpterminal.h"
 #include "p2pswitcher.h"
+#include "portscansending.h"
 #include "udppuncher.h"
 #include <string.h>
 
@@ -31,8 +32,12 @@ int main(int argc, char **argv)
     }
 #endif
 
-
-    if(!strncmp("s", argv[1], 1))
+    if(!strcmp("scan", argv[1]))
+    {
+        int selfPort = atoi(argv[2]);
+        PortScanSending portScanSending(std::string(argv[3]), atoi(argv[4]), atoi(argv[5]), selfPort);
+    }
+    else if(!strncmp("s", argv[1], 1))
     {
         int port = atoi(argv[2]);
         P2pSwitcher p2pSwitcher(port);

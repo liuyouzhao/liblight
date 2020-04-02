@@ -58,7 +58,7 @@ void UdpPuncher::run(ThreadPool *threadPool)
         {
             this->udp->send(peerAddress, peerPort, name.c_str(), name.length());
         }
-        sleep(1);
+        usleep(1000);
     }
 }
 
