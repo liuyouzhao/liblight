@@ -15,5 +15,9 @@ add_executable(${PROJECT_NAME}  "main.cpp"
                                 "threadpool.cpp"
                                 "udpterminal.cpp"
                                 "udpterminal.h"
+                                "udppuncher.h"
+                                "udppuncher.cpp"
+                                "p2pswitcher.h"
+                                "p2pswitcher.cpp"
                                 "log.h")
 target_link_libraries(udp_punching_test pthread)

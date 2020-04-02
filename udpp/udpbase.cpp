@@ -51,4 +51,24 @@ int UdpBase::recv(void* (*recv_hook)(UdpBase*, char*, int, char*, int), void* (*
     return UdpTransState::UDP_RECV_OK;
 }
 
+int UdpBase::recv(void* (*recv_hook)(UdpBase*, char*, int, char*, int, void*), void* (*error_hook)(int), void *param)
+{
+    struct sockaddr_in addrClient;
+    int socketlen = sizeof(addrClient);
+    int n = 0;
+    memset(mRecvCache, 0, sizeof(mRecvCache));
+    n = recvfrom(mSocketfd, mRecvCache, sizeof(mRecvCache), 0, (struct sockaddr*) &addrClient, (socklen_t*) &socketlen);
+    if(n < 0)
+    {
+        if(error_hook)
+            error_hook(UdpTransState::UDP_RECV_FAILED);
+        return UdpTransState::UDP_RECV_FAILED;
+    }
+    char *clientAddr = inet_ntoa(addrClient.sin_addr);
+    int clientPort = ntohs(addrClient.sin_port);
+    if(recv_hook)
+        recv_hook(this, clientAddr, clientPort, mRecvCache, n, param);
+    return UdpTransState::UDP_RECV_OK;
+}
+
 } // namespace udpp

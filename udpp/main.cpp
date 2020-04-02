@@ -3,9 +3,13 @@
 #include "log.h"
 #include "threadpool.h"
 #include "udpterminal.h"
+#include "p2pswitcher.h"
+#include "udppuncher.h"
+#include <string.h>
 
 
 using namespace std;
+using namespace udpp;
 
 void *func(void *param)
 {
@@ -27,9 +31,29 @@ int main(int argc, char **argv)
     }
 #endif
 
+
+    if(!strncmp("s", argv[1], 1))
+    {
+        int port = atoi(argv[2]);
+        P2pSwitcher p2pSwitcher(port);
+        p2pSwitcher.run();
+    }
+    else if(!strncmp("p", argv[1], 1))
+    {
+
+        int port = atoi(argv[2]);
+        std::string ssIp = std::string(argv[3]);
+        int ssPort = atoi(argv[4]);
+        std::string name = std::string(argv[5]);
+        UdpPuncher udpPuncher(name, port, ssIp, ssPort);
+        ThreadPool threadpool(2, 5);
+        udpPuncher.run(&threadpool);
+    }
+
+    cout << "Usage: udp_punching_test [s/p] [self-port] [swicher-ip] [swicher-port] [name]" << endl;
     /// punching try
-    udpp::UdpTerminal udpTerminal;
-    udpTerminal.loopRun(argv + 1, argc - 1);
+    //udpp::UdpTerminal udpTerminal;
+    //udpTerminal.loopRun(argv + 1, argc - 1);
 
     return 0;
 }
