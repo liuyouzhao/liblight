@@ -9,18 +9,25 @@ namespace udpp
 {
 
 #define CACHE_OVERFLOW 1024
+class TempUdpClientAddress
+{
+public:
+    TempUdpClientAddress(std::string ip, int pt)
+    {
+        this->ip = ip;
+        port = pt;
+    }
+    std::string ip;
+    int port;
+};
 
 class UdpTerminal
 {
 public:
     UdpTerminal();
-    void loopRun();
-    inline void pushLine(std::string line) {    recvLines.push_back(line); }
-    inline void solveOverflow() {   if(recvLines.size() > CACHE_OVERFLOW) recvLines.erase(recvLines.begin());   }
-protected:
-    void dumpLines();
+    void loopRun(char **arr, int len);
 private:
-    std::vector<std::string> recvLines;
+    void interactiveRun();
     ThreadPool threadPool;
 };
 

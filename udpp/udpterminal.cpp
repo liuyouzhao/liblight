@@ -3,27 +3,54 @@
 #include "udpserver.h"
 #include "log.h"
 #include <iostream>
+#include <unistd.h>
 #include <string.h>
 
 namespace udpp
 {
+static std::vector<TempUdpClientAddress> recvLines;
+void pushLine(std::string ip, int port)
+{
+    for(int i = 0; i < recvLines.size(); i ++)
+    {
+        TempUdpClientAddress t = recvLines[i];
+        if(strcmp(t.ip.c_str(), ip.c_str()) == 0)
+        {
+            return;
+        }
+    }
+    TempUdpClientAddress t1(ip, port);
+    recvLines.push_back(t1);
+}
 
 UdpTerminal::UdpTerminal():
     threadPool(10, 20)
 {
 }
 
-void *show_clients_by_server(UdpServer *server, char *ip, int port, char *msg, int len)
+void *show_clients_by_server(UdpBase *server, char *ip, int port, char *msg, int len)
 {
     Log::d("%s:%d sent %s length %d", ip, port, msg, len);
-    char buf[BUFSIZ] = {0};
-    sprintf(buf, "[Server Recv] %s", msg);
-    server->send(std::string(ip), port, buf, strlen(buf));
+
+#if PING_PONG
+    pushLine(std::string(ip), port);
+
+    for(int i = 0; i < recvLines.size(); i ++)
+    {
+        TempUdpClientAddress t = recvLines[i];
+        std::stringstream ss;
+        ss << t.ip << " " << t.port << std::endl;
+        std::string tosend = std::string(ss.str());
+        server->send(std::string(ip), port, tosend.c_str(), tosend.length());
+    }
+#endif
+    server->send(std::string(ip), port, msg, len);
 }
 
-void *show_anywhere_by_client(UdpClient *client, char *ip, int port, char *msg, int len)
+void *show_anywhere_by_client(UdpBase *client, char *ip, int port, char *msg, int len)
 {
     Log::d("%s:%d sent %s length %d", ip, port, msg, len);
+    client->send(std::string(ip), port, msg, len);
 }
 
 
@@ -54,32 +81,24 @@ void *thread_recv_client(void *param)
     }
 }
 
-void UdpTerminal::dumpLines()
+void *show_any_by_any(UdpBase *client, char *ip, int port, char *msg, int len)
 {
-    for(int i = 0; i < this->recvLines.size(); i ++)
-    {
-        std::string line = recvLines[i];
-        std::cout << line.c_str() << std::endl;
-    }
+    Log::d("RECV FROM [%s:%d], MSG: %s", ip, port, msg);
 }
 
-void *threadpool_broadcast(void *param)
+void *thread_recv_base(void *param)
 {
-    void **ptrArr = (void**)param;
-    UdpClient *udpClient = (UdpClient*)ptrArr[0];
-    std::string targetAddress = *(std::string*)ptrArr[1];
-    int i = *(int*)ptrArr[2];
-    udpClient->target(targetAddress, i);
-    char *tosend = "xxxxxxxxx";
-    udpClient->send(tosend, sizeof(tosend));
+    UdpBase *udpBase = (UdpBase*)param;
+    while(1)
+        udpBase->recv(show_any_by_any, NULL);
 }
 
-void UdpTerminal::loopRun()
+void UdpTerminal::interactiveRun()
 {
     char input[512] = {0};
-
     std::cout << "[1] Server" << std::endl << "[2] Client" << std::endl << "1 or 2 (default 1):";
     std::cin >> input;
+
     if(strcmp("1", input) == 0)
     {
         memset(input, 0, sizeof(input));
@@ -128,6 +147,8 @@ void UdpTerminal::loopRun()
     else if(strcmp("2", input) == 0)
     {
         UdpClient udpClient;
+        std::string targetAddress;
+        int port;
         void* pointers[2] = {&udpClient, this};
         threadPool.run(thread_recv_client, pointers);
         while(1)
@@ -138,24 +159,21 @@ void UdpTerminal::loopRun()
             std::cin >> input;
             if(strcmp("t", input) == 0)
             {
-                int port;
                 memset(input, 0, sizeof(input));
                 std::cout << "Target IP Address:";
                 std::cin >> input;
-                std::string targetAddress = std::string(input);
+                targetAddress = std::string(input);
 
                 memset(input, 0, sizeof(input));
                 std::cout << "Port:";
                 std::cin >> input;
                 port = atoi(input);
-
-                udpClient.target(targetAddress, port);
             }
             else if(strcmp("s", input) == 0)
             {
                 std::cout << "Message to send:";
                 std::cin >> input;
-                int st = udpClient.send(input, strlen(input));
+                int st = udpClient.send(targetAddress, port, input, strlen(input));
                 if(st < 0)
                 {
                     Log::e("udp send failed with error code %d", st);
@@ -163,29 +181,52 @@ void UdpTerminal::loopRun()
             }
         }
     }
-    else if(strcmp("3", input) == 0)
+}
+
+void UdpTerminal::loopRun(char **arr, int len)
+{
+    int i = 0;
+    if(len > 0)
     {
-        UdpClient udpClient;
-        int port;
-        memset(input, 0, sizeof(input));
-        std::cout << "Target IP Address:";
-        std::cin >> input;
-        std::string targetAddress = std::string(input);
+        UdpBase *pUdp = NULL;
+        std::string targetAddr;
+        int targetPort = 0;
+        std::string message;
+        char msg[512] = {0};
 
-        udpClient.target(std::string("35.183.10.230"), 9001);
-        udpClient.send("hi", 2);
-
-
-        ThreadPool tp(500, 1000);
-        for(int i = 0; i < 65535; i ++)
+        if(!strncmp("1", *arr, 1) ||
+           !strncmp("s", *arr, 1))
         {
-            void* pointers[3] = {&udpClient, &targetAddress, &i};
-            threadpool_broadcast(pointers);
+            pUdp = new UdpServer(atoi(*(arr + 1)));
+            arr = arr + 2;
         }
+        else if(!strncmp("2", *arr, 1) ||
+                !strncmp("c", *arr, 1))
+        {
+            pUdp = new UdpClient();
+            arr = arr + 1;
+        }
+        targetAddr = std::string(*arr);
+        targetPort = atoi(*(arr + 1));
+        if(*(arr + 2) && strlen(*(arr + 2)) > 0)
+            message = std::string(*(arr + 2));
+        else
+        {
+            std::cin >> msg;
+            message = std::string(msg);
+        }
+        threadPool.run(thread_recv_base, pUdp);
 
-        void* pointers[2] = {&udpClient, this};
-        threadPool.run(thread_recv_client, pointers);
-
+        /// loop send
+        while(1)
+        {
+            pUdp->send(targetAddr, targetPort, message.c_str(), message.length());
+            sleep(1);
+        }
+    }
+    else
+    {
+        interactiveRun();
     }
 }
 

@@ -5,6 +5,8 @@ project(udp_punching_test)
 
 add_executable(${PROJECT_NAME}  "main.cpp"
                                 "udp.h"
+                                "udpbase.h"
+                                "udpbase.cpp"
                                 "udpclient.h"
                                 "udpclient.cpp"
                                 "udpserver.h"

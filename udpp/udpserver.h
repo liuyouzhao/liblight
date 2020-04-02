@@ -6,21 +6,18 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include "udpbase.h"
 
 namespace udpp
 {
 
-class UdpServer
+class UdpServer : public UdpBase
 {
 public:
+    UdpServer() {};
     UdpServer(int port);
-    int recv(void* (*recv_hook)(UdpServer*, char*, int, char*, int), void* (*error_hook)(int));
-    int send(std::string clientAddress, int port, const char *buffer, int len);
-    inline char *getRecvCache() {  return mRecvCache;  }
-private:
-    int mSocketfd;
-    int mSocketLen;
-    char mRecvCache[BUFSIZ];
+    virtual int init(int port = -1);
+    virtual int deinit();
 };
 
 } // namespace udpp

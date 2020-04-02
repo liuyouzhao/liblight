@@ -14,11 +14,10 @@ void *func(void *param)
     usleep(1000 * 5000);
 }
 
-int main()
+int main(int argc, char **argv)
 {
-    udpp::ThreadPool threadPool(200, 500);
-
 #if 0
+    udpp::ThreadPool threadPool(200, 500);
     int i = 0;
     while(1)
     {
@@ -30,7 +29,7 @@ int main()
 
     /// punching try
     udpp::UdpTerminal udpTerminal;
-    udpTerminal.loopRun();
+    udpTerminal.loopRun(argv + 1, argc - 1);
 
     return 0;
 }
