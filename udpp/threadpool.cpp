@@ -1,5 +1,6 @@
 #include "threadpool.h"
 #include <pthread.h>
+#include <unistd.h>
 #include "log.h"
 
 namespace udpp
@@ -8,7 +9,7 @@ namespace udpp
 void *thread_func(void *param)
 {
     ThreadObject *threadObject = (ThreadObject*)param;
-
+    threadObject->threadId = pthread_self();
     while(threadObject->started)
     {
         pthread_mutex_lock(&(threadObject->__mutex));
@@ -18,12 +19,18 @@ void *thread_func(void *param)
         }
         pthread_mutex_unlock(&(threadObject->__mutex));
 
+        if(!threadObject->started)
+        {
+#if DEBUG
+            Log::d("threadObject is FINISHED expectedly %d %d", threadObject->alive, threadObject->started);
+#endif
+            return NULL;
+        }
+
         threadObject->run();
         threadObject->done();
     }
-
     Log::w("threadObject is FINISHED unexpectedly %d %d", threadObject->alive, threadObject->started);
-
     return NULL;
 }
 
@@ -49,22 +56,41 @@ ThreadObject::~ThreadObject()
 
 void ThreadObject::done()
 {
-    poolRef->idleThread(this);
+    pthread_mutex_lock(&__mutex);
     alive = 0;
     thread_job_hook = NULL;
+    pthread_mutex_unlock(&__mutex);
+
+    poolRef->idleThread(this);
 }
 
 void ThreadObject::run()
 {
     if(thread_job_hook != NULL)
-        thread_job_hook(param);
+        thread_job_hook(param, this->poolRef);
 }
 
 void ThreadObject::notify()
 {
+    pthread_mutex_lock(&__mutex);
     alive = 1;
-    pthread_mutex_unlock(&__mutex);
     pthread_cond_signal(&__cond);
+    pthread_mutex_unlock(&__mutex);
+}
+
+void *threadpool_intrinsic_thread_func(void *param)
+{
+    ThreadPool *thiz = (ThreadPool*) param;
+    while(1)
+    {
+        pthread_mutex_lock(&(thiz->intrinsicMutex));
+        while(!thiz->ialive())
+        {
+            pthread_cond_wait(&(thiz->intrinsicCond), &(thiz->intrinsicMutex));
+        }
+        pthread_mutex_unlock(&(thiz->intrinsicMutex));
+        thiz->consumeQueue();
+    }
 }
 
 ThreadPool::ThreadPool(int maxThreadsNumber, int waitQueueSize)
@@ -76,8 +102,8 @@ ThreadPool::ThreadPool(int maxThreadsNumber, int waitQueueSize)
     }
     pthread_mutexattr_t attr;
     pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-    pthread_mutex_init(&mutex, &attr);
-
+    pthread_mutex_init(&systemMutex, &attr);
+    pthread_mutex_init(&userMutex, &attr);
 
     mWaitQueueSize = waitQueueSize;
     for(int i = 0; i < maxThreadsNumber; i ++)
@@ -85,11 +111,15 @@ ThreadPool::ThreadPool(int maxThreadsNumber, int waitQueueSize)
         ThreadObject* threadObject = new ThreadObject(this);
         mPoolIdle.push_back(threadObject);
     }
+
+    pthread_mutex_init(&intrinsicMutex, NULL);
+    pthread_cond_init(&intrinsicCond, NULL);
+    pthread_create(&intrinsicThread, NULL, threadpool_intrinsic_thread_func, this);
 }
 
 ThreadPool::~ThreadPool()
 {
-    pthread_mutex_lock(&mutex);
+    lockSystem(__FUNCTION__, __LINE__);
     for(std::list<ThreadObject*>::iterator iter = mPoolBusy.begin(); iter != mPoolBusy.end(); iter ++)
     {
         ThreadObject* threadObject = (ThreadObject*)*iter;
@@ -97,35 +127,41 @@ ThreadPool::~ThreadPool()
         pthread_join(threadObject->thread, NULL);
         delete threadObject;
     }
-
     for(std::list<ThreadObject*>::iterator iter = mPoolIdle.begin(); iter != mPoolIdle.end(); iter ++)
     {
         ThreadObject* threadObject = (ThreadObject*)*iter;
-        threadObject->started = 0;
-        threadObject->notify();
-        pthread_join(threadObject->thread, NULL);
+        threadObject->terminate();
         delete threadObject;
     }
-    pthread_mutex_unlock(&mutex);
+    unlockSystem(__FUNCTION__, __LINE__);
 }
 
 void ThreadPool::consumeQueue()
 {
-    pthread_mutex_lock(&mutex);
-    while(mQueue.size() > 0 && mPoolIdle.size() > 0)
+    while(1)
     {
+        lockSystem(__FUNCTION__, __LINE__);
+        if(mQueue.size() == 0)
+        {
+            unlockSystem(__FUNCTION__, __LINE__);
+            break;
+        }
         ThreadWaitQueue threadWaitQueue = mQueue.front();
         mQueue.pop_front();
+
+        unlockSystem(__FUNCTION__, __LINE__);
+
         run(threadWaitQueue.thread_job_hook, threadWaitQueue.param);
     }
-    pthread_mutex_unlock(&mutex);
+
+    pthread_mutex_lock(&this->intrinsicMutex);
+    this->intrinsicAlive = 0;
+    pthread_mutex_unlock(&this->intrinsicMutex);
 }
 
-void ThreadPool::run(void* (*thread_job_hook)(void* p), void *param)
+void ThreadPool::run(void* (*thread_job_hook)(void*, ThreadPool*), void *param)
 {
-    consumeQueue();
-
-    pthread_mutex_lock(&mutex);
+    lockSystem(__FUNCTION__, __LINE__);
 
     if(mPoolIdle.size() == 0)
     {
@@ -146,23 +182,46 @@ void ThreadPool::run(void* (*thread_job_hook)(void* p), void *param)
         threadObject->notify();
     }
 
-    pthread_mutex_unlock(&mutex);
+    unlockSystem(__FUNCTION__, __LINE__);
 }
 
 int ThreadPool::idleThread(ThreadObject *threadObject)
 {
-    pthread_mutex_lock(&mutex);
-
+    lockSystem(__FUNCTION__, __LINE__);
     mPoolBusy.remove(threadObject);
     mPoolIdle.push_back(threadObject);
-    pthread_mutex_unlock(&mutex);
+    unlockSystem(__FUNCTION__, __LINE__);
+
+    pthread_mutex_lock(&this->intrinsicMutex);
+    pthread_cond_signal(&this->intrinsicCond);
+    this->intrinsicAlive = 1;
+    pthread_mutex_unlock(&this->intrinsicMutex);
 }
 
 void ThreadPool::dump()
 {
-    pthread_mutex_lock(&mutex);
+    lockSystem(__FUNCTION__, __LINE__);
     Log::d("TP - B[%d] I[%d] W[%d]", mPoolBusy.size(), mPoolIdle.size(), mQueue.size());
-    pthread_mutex_unlock(&mutex);
+    unlockSystem(__FUNCTION__, __LINE__);
+}
+
+void ThreadPool::waitPool()
+{
+    while(1)
+    {
+        lockSystem(__FUNCTION__, __LINE__);
+        if(mPoolBusy.size() == 0)
+        {
+            unlockSystem(__FUNCTION__, __LINE__);
+            return;
+        }
+        unlockSystem(__FUNCTION__, __LINE__);
+
+        usleep(1000 * 100);
+#if DEBUG
+        dump();
+#endif
+    }
 }
 
 } // namespace udpp

@@ -25,7 +25,7 @@ static void *on_recv(UdpBase *server, char *ip, int port, char *msg, int len, vo
     }
 }
 
-static void *tp_run_recv(void *param)
+static void *tp_run_recv(void *param, ThreadPool* tp)
 {
     UdpPuncher *ptrThis = (UdpPuncher*)param;
     while(1)

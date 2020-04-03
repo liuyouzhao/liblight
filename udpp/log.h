@@ -20,7 +20,7 @@
 #define DO_LOG(color, format, va) \
     std::string contentFormat = std::string(format);\
     std::stringstream ss;\
-    ss << "[Thread-" << pthread_self() << "] " << contentFormat;\
+    ss << "[Thread-" << std::hex << pthread_self() << "] " << contentFormat;\
     contentFormat = std::string(ss.str());\
     contentFormat = std::string(color) + contentFormat + std::string(KNRM "\n");\
     vprintf(contentFormat.c_str(), va);

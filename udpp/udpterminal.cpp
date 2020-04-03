@@ -59,7 +59,7 @@ void *on_server_error(int err)
     Log::e("Error number %d with inner errno %d %s", err, errno, strerror(errno));
 }
 
-void *thread_recv_server(void *param)
+void *thread_recv_server(void *param, ThreadPool* tp)
 {
     void **ptrArr = (void**)param;
     UdpServer *udpServer = (UdpServer*)ptrArr[0];
@@ -70,7 +70,7 @@ void *thread_recv_server(void *param)
     }
 }
 
-void *thread_recv_client(void *param)
+void *thread_recv_client(void *param, ThreadPool* tp)
 {
     void **ptrArr = (void**)param;
     UdpClient *udpClient = (UdpClient*)ptrArr[0];
@@ -86,7 +86,7 @@ void *show_any_by_any(UdpBase *client, char *ip, int port, char *msg, int len)
     Log::d("RECV FROM [%s:%d], MSG: %s", ip, port, msg);
 }
 
-void *thread_recv_base(void *param)
+void *thread_recv_base(void *param, ThreadPool* tp)
 {
     UdpBase *udpBase = (UdpBase*)param;
     while(1)
