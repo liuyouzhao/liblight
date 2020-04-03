@@ -1,5 +1,6 @@
 #include "portscansending.h"
 #include <string>
+#include <unistd.h>
 #include "udpserver.h"
 #include "threadpool.h"
 #include "log.h"
@@ -33,7 +34,13 @@ PortScanSending::PortScanSending(std::string ip, int f, int t, int selfPort)
         PssPair *pp = new PssPair();
         pp->ptr = this;
         pp->i = i;
-        this->trySend(ip, i);
+        Log::i("scan %s:%d", ip.c_str(), i);
+        for(int j = 0; j < 100; j ++)
+        {
+            this->trySend(ip, i);
+        }
+
+        usleep(1000 * 1000);
         //threadPool.run(scanScand, pp);
     }
 

@@ -32,6 +32,13 @@ int main(int argc, char **argv)
     }
 #endif
 
+    if(argc == 1)
+    {
+        udpp::UdpTerminal udpTerminal;
+        udpTerminal.loopRun(argv + 1, argc - 1);
+    }
+
+
     if(!strcmp("scan", argv[1]))
     {
         int selfPort = atoi(argv[2]);
@@ -56,9 +63,7 @@ int main(int argc, char **argv)
     }
 
     cout << "Usage: udp_punching_test [s/p] [self-port] [swicher-ip] [swicher-port] [name]" << endl;
-    /// punching try
-    //udpp::UdpTerminal udpTerminal;
-    //udpTerminal.loopRun(argv + 1, argc - 1);
+
 
     return 0;
 }

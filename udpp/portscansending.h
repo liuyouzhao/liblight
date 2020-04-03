@@ -20,7 +20,6 @@ public:
     PortScanSending(std::string ip, int f, int t, int selfPort);
     void trySend(std::string ip, int port)
     {
-        Log::i("scan %s:%d", ip.c_str(), port);
         udp->send(ip, port, "hi", 2);
     }
     inline std::string getAddr() { return addr; }
